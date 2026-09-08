@@ -16,14 +16,20 @@ planned.
 
 ## Supported versions
 
-| Loader | Minecraft | Loader version   | Java |
-| ------ | --------- | ---------------- | ---- |
-| Fabric | 1.21.1    | Fabric Loader 0.16.10 | 21 |
-| Forge  | 1.20.1    | Forge 47.3.0     | 17   |
+| Loader | Minecraft | Loader version        | Java |
+| ------ | --------- | --------------------- | ---- |
+| Fabric | 1.21.1    | Fabric Loader 0.16.10 | 21   |
+| Forge  | 1.21.1    | Forge 52.1.0          | 21   |
+| Forge  | 1.20.1    | Forge 47.3.0          | 17   |
 
-Forge stops at 1.20.1 because that is the last Minecraft version with a stable
-MinecraftForge release line; newer versions moved to NeoForge. Fabric targets
-1.21.1, which requires Java 21.
+Minecraft 1.20.5 and later are compiled against Java 21, earlier releases
+against Java 17, so building every row needs both JDKs installed. The Forge
+module builds both targets from one source set: `TickEvent.LevelTickEvent` is
+unchanged between Forge 47 and 52, so no per-version source is needed.
+
+The older 1.17.1-1.19.2 targets the build matrix used to list were dropped. A
+single source set cannot span them, because the mappings and the required Java
+version differ across that range, and those builds never actually worked.
 
 ## Building
 

@@ -56,8 +56,8 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-  # 1.20.1 is the last Minecraft version with a stable MinecraftForge release
-  # line; newer versions moved to NeoForge.
+  # Minecraft 1.20.5+ is compiled against Java 21, so each Forge target
+  # carries the JDK it needs.
   forge:
     name: Forge ${{ matrix.mc }}
     runs-on: ubuntu-latest
@@ -67,14 +67,18 @@ jobs:
         include:
           - mc: "1.20.1"
             forge: "47.3.0"
+            java: "17"
+          - mc: "1.21.1"
+            forge: "52.1.0"
+            java: "21"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Set up Java ${{ matrix.java }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: ${{ matrix.java }}
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4

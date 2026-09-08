@@ -10,13 +10,19 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
 TOOLS_DIR="$ROOT_DIR/.tools"
 
-# Build targets. Fabric tracks 1.21.1; Forge stops at 1.20.1, the last Minecraft
-# version with a stable MinecraftForge line (newer versions moved to NeoForge).
+# Build targets.
 FABRIC_MC="1.21.1"
 FABRIC_LOADER="0.16.10"
 FABRIC_API="0.115.1+1.21.1"
-FORGE_MC="1.20.1"
-FORGE_VERSION="47.3.0"
+
+# Forge targets as "minecraft:forge". Minecraft 1.20.5+ is compiled against
+# Java 21 and earlier releases against Java 17; forge/build.gradle picks the
+# matching toolchain from the version, so both JDKs must be installed to build
+# every row here.
+FORGE_TARGETS=(
+  "1.20.1:47.3.0"
+  "1.21.1:52.1.0"
+)
 
 # Each loader pins its own Gradle, matching .github/workflows/build-jars.yml.
 # Fabric Loom 1.7.x calls the incubating Gradle API
@@ -70,15 +76,18 @@ FABRIC_GRADLE_CMD="$(ensure_gradle "$FABRIC_GRADLE")"
 mkdir -p "$DIST_DIR/fabric/$FABRIC_MC"
 cp "$ROOT_DIR/fabric/build/libs"/*.jar "$DIST_DIR/fabric/$FABRIC_MC/"
 
-echo "==> Building Forge $FORGE_MC (Gradle $FORGE_GRADLE)"
 FORGE_GRADLE_CMD="$(ensure_gradle "$FORGE_GRADLE")"
-(
-  cd "$ROOT_DIR"
-  "$FORGE_GRADLE_CMD" -p forge clean build \
-    -Pminecraft_version="$FORGE_MC" \
-    -Pforge_version="$FORGE_VERSION"
-)
-mkdir -p "$DIST_DIR/forge/$FORGE_MC"
-cp "$ROOT_DIR/forge/build/libs"/*.jar "$DIST_DIR/forge/$FORGE_MC/"
+for target in "${FORGE_TARGETS[@]}"; do
+  IFS=':' read -r forge_mc forge_version <<< "$target"
+  echo "==> Building Forge $forge_mc (Gradle $FORGE_GRADLE)"
+  (
+    cd "$ROOT_DIR"
+    "$FORGE_GRADLE_CMD" -p forge clean build \
+      -Pminecraft_version="$forge_mc" \
+      -Pforge_version="$forge_version"
+  )
+  mkdir -p "$DIST_DIR/forge/$forge_mc"
+  cp "$ROOT_DIR/forge/build/libs"/*.jar "$DIST_DIR/forge/$forge_mc/"
+done
 
 echo "Built artifacts are in $DIST_DIR"
