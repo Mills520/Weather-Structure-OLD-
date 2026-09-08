@@ -1,12 +1,14 @@
 modLoader="javafml"
-loaderVersion="[37,)"
+loaderVersion="[47,)"
 license="MIT"
+issueTrackerURL="https://github.com/Mills520/Weather-Structure-OLD-/issues"
 
 [[mods]]
 modId="weatherrythme"
 version="${file.jarVersion}"
 displayName="WeatherRythme"
 authors="Mills520"
+displayURL="https://github.com/Mills520/Weather-Structure-OLD-"
 description='''
 Randomly changes overworld weather every 5-15 minutes.
 '''
@@ -15,13 +17,13 @@ credits="Made by Mills520. Thanks to all contributors on GitHub under the contri
 [[dependencies.weatherrythme]]
 modId="forge"
 mandatory=true
-versionRange="[37,)"
+versionRange="[47,)"
 ordering="NONE"
 side="BOTH"
 
 [[dependencies.weatherrythme]]
 modId="minecraft"
 mandatory=true
-versionRange="[1.17.1,1.22)"
+versionRange="[1.20.1,1.21)"
 ordering="NONE"
 side="BOTH"

@@ -5,7 +5,7 @@ buildscript {
         gradlePluginPortal()
     }
     dependencies {
-        classpath 'net.fabricmc:fabric-loom:1.6.12'
+        classpath 'net.fabricmc:fabric-loom:1.7.4'
     }
 }
 
@@ -13,8 +13,13 @@ apply plugin: 'fabric-loom'
 apply plugin: 'maven-publish'
 
 version = project.findProperty('mod_version') ?: '1.0.0'
+
+def mcVersion = project.findProperty('minecraft_version') ?: '1.21.1'
+def loaderVersion = project.findProperty('fabric_loader_version') ?: '0.16.10'
+def fabricApiVersion = project.findProperty('fabric_api_version') ?: '0.115.1+1.21.1'
+
 base {
-    archivesName = "weatherrythme-fabric-${project.findProperty('minecraft_version') ?: '1.21.1'}"
+    archivesName = "weatherrythme-fabric-${mcVersion}"
 }
 
 repositories {
@@ -22,26 +27,25 @@ repositories {
     mavenCentral()
 }
 
-def mcVersion = project.findProperty('minecraft_version') ?: '1.21.1'
-def yarnVersion = project.findProperty('yarn_mappings') ?: "${mcVersion}+build.1"
-def loaderVersion = project.findProperty('fabric_loader_version') ?: '0.16.10'
-def fabricApiVersion = project.findProperty('fabric_api_version') ?: '0.115.1+1.21.1'
-
 dependencies {
     minecraft "com.mojang:minecraft:${mcVersion}"
-    mappings "net.fabricmc:yarn:${yarnVersion}:v2"
+    // Official Mojang mappings: the mod sources are written against Mojang names
+    // (ServerLevel, setWeatherParameters, ...) so both loaders share one vocabulary
+    // and there is no Yarn build number to keep pinned.
+    mappings loom.officialMojangMappings()
     modImplementation "net.fabricmc:fabric-loader:${loaderVersion}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
 }
 
 java {
-    toolchain { languageVersion = JavaLanguageVersion.of(17) }
+    // Minecraft 1.20.5+ (this includes 1.21.1) is compiled against Java 21.
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
     withSourcesJar()
 }
 
 processResources {
-    inputs.property "version", project.version
-    filesMatching("fabric.mod.json") {
-        expand "version": project.version
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') {
+        expand 'version': project.version
     }
 }

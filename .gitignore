@@ -1,0 +1,19 @@
+# Gradle
+build/
+.gradle/
+
+# build_all.sh output and bootstrapped toolchain
+dist/
+.tools/
+
+# Loom / ForgeGradle working directories
+run/
+.architectury-transformer/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/

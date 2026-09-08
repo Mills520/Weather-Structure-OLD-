@@ -4,14 +4,18 @@ plugins {
 }
 
 version = project.findProperty('mod_version') ?: '1.0.0'
-base {
-    archivesName = "weatherrythme-forge-${project.findProperty('minecraft_version') ?: '1.20.1'}"
-}
 
+// 1.20.1 is the last Minecraft version with a stable MinecraftForge release line;
+// newer versions moved to NeoForge, so this module stops here.
 def mcVersion = project.findProperty('minecraft_version') ?: '1.20.1'
 def forgeVersion = project.findProperty('forge_version') ?: '47.3.0'
 
+base {
+    archivesName = "weatherrythme-forge-${mcVersion}"
+}
+
 repositories {
+    maven { url = 'https://maven.minecraftforge.net' }
     mavenCentral()
 }
 
