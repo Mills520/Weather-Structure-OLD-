@@ -8,7 +8,9 @@
     "Mills520"
   ],
   "contact": {
-    "sources": "https://github.com"
+    "homepage": "https://github.com/Mills520/Weather-Structure-OLD-",
+    "sources": "https://github.com/Mills520/Weather-Structure-OLD-",
+    "issues": "https://github.com/Mills520/Weather-Structure-OLD-/issues"
   },
   "license": "MIT",
   "environment": "*",
@@ -18,9 +20,10 @@
     ]
   },
   "depends": {
-    "fabricloader": ">=0.14.0",
-    "minecraft": ">=1.17.1 <=1.21.1",
-    "java": ">=17"
+    "fabricloader": ">=0.16.0",
+    "fabric-api": "*",
+    "minecraft": "~1.21.1",
+    "java": ">=21"
   },
   "custom": {
     "credits": "Made by Mills520. Thanks to all contributors on GitHub under the contributors tag."

@@ -4,14 +4,21 @@ plugins {
 }
 
 version = project.findProperty('mod_version') ?: '1.0.0'
+
+def mcVersion = project.findProperty('minecraft_version') ?: '1.21.1'
+def forgeVersion = project.findProperty('forge_version') ?: '52.1.0'
+
+// Minecraft 1.20.5+ is compiled against Java 21; earlier releases use Java 17.
+// Of the versions built here that means 1.20.1 -> 17 and 1.21.1 -> 21.
+def javaVersion = (project.findProperty('java_version')
+    ?: (mcVersion.startsWith('1.20') ? '17' : '21')).toString().toInteger()
+
 base {
-    archivesName = "weatherrythme-forge-${project.findProperty('minecraft_version') ?: '1.20.1'}"
+    archivesName = "weatherrythme-forge-${mcVersion}"
 }
 
-def mcVersion = project.findProperty('minecraft_version') ?: '1.20.1'
-def forgeVersion = project.findProperty('forge_version') ?: '47.3.0'
-
 repositories {
+    maven { url = 'https://maven.minecraftforge.net' }
     mavenCentral()
 }
 
@@ -24,7 +31,7 @@ minecraft {
 }
 
 java {
-    toolchain { languageVersion = JavaLanguageVersion.of(17) }
+    toolchain { languageVersion = JavaLanguageVersion.of(javaVersion) }
     withSourcesJar()
 }
 

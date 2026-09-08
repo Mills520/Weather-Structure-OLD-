@@ -2,124 +2,92 @@
 set -euo pipefail
 
 # If invoked by a non-bash shell, re-exec with bash.
-if [[ -z "${BASH_VERSION:-}" ]]; then
+if [ -z "${BASH_VERSION:-}" ]; then
   exec bash "$0" "$@"
 fi
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
 TOOLS_DIR="$ROOT_DIR/.tools"
-GRADLE_VERSION="8.14.3"
-GRADLE_HOME="$TOOLS_DIR/gradle-${GRADLE_VERSION}"
-GRADLE_BIN="$GRADLE_HOME/bin/gradle"
+
+# Build targets.
+FABRIC_MC="1.21.1"
+FABRIC_LOADER="0.16.10"
+FABRIC_API="0.115.1+1.21.1"
+
+# Forge targets as "minecraft:forge". Minecraft 1.20.5+ is compiled against
+# Java 21 and earlier releases against Java 17; forge/build.gradle picks the
+# matching toolchain from the version, so both JDKs must be installed to build
+# every row here.
+FORGE_TARGETS=(
+  "1.20.1:47.3.0"
+  "1.21.1:52.1.0"
+)
+
+# Each loader pins its own Gradle, matching .github/workflows/build-jars.yml.
+# Fabric Loom 1.7.x calls the incubating Gradle API
+# Problems.forNamespace(String), which exists only in Gradle 8.6-8.12 and was
+# removed in later releases; on Gradle 8.13+ applying the plugin fails with
+# NoSuchMethodError. ForgeGradle 6 is happy on current Gradle.
+FABRIC_GRADLE="8.10.2"
+FORGE_GRADLE="8.14.3"
+
 mkdir -p "$DIST_DIR" "$TOOLS_DIR"
 
+# ensure_gradle <version> -> echoes a gradle executable for exactly that version.
+# The system gradle is reused only on an exact version match, because these
+# builds are sensitive to the Gradle version; otherwise the version is
+# downloaded into .tools/. Progress messages go to stderr so they are not
+# captured by the caller.
 ensure_gradle() {
+  local want="$1"
+  local home="$TOOLS_DIR/gradle-${want}"
+  local bin="$home/bin/gradle"
+
   if command -v gradle >/dev/null 2>&1; then
     local current
-    current="$(gradle -v 2>/dev/null | awk '/Gradle /{print $2; exit}' || true)"
-    if [[ -n "$current" ]]; then
-      local major
-      major="${current%%.*}"
-      if [[ "$major" =~ ^[0-9]+$ ]] && (( major >= 8 )); then
-        echo "Using system Gradle $current" >&2
-        echo "Using system Gradle $current"
-        echo "gradle"
-        return 0
-      fi
+    current="$(gradle -v 2>/dev/null | awk '/^Gradle /{print $2; exit}' || true)"
+    if [[ "$current" == "$want" ]]; then
+      echo "Using system Gradle $current" >&2
+      command -v gradle
+      return 0
     fi
   fi
 
-  if [[ ! -x "$GRADLE_BIN" ]]; then
-    local zip="$TOOLS_DIR/gradle-${GRADLE_VERSION}-bin.zip"
-    echo "System Gradle is missing/too old. Downloading Gradle ${GRADLE_VERSION}..." >&2
-    echo "System Gradle is missing/too old. Downloading Gradle ${GRADLE_VERSION}..."
-    curl -fL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o "$zip"
+  if [[ ! -x "$bin" ]]; then
+    local zip="$TOOLS_DIR/gradle-${want}-bin.zip"
+    echo "Downloading Gradle ${want}..." >&2
+    curl -fL "https://services.gradle.org/distributions/gradle-${want}-bin.zip" -o "$zip"
     unzip -q -o "$zip" -d "$TOOLS_DIR"
   fi
 
-  echo "$GRADLE_BIN"
+  echo "$bin"
 }
 
-GRADLE_CMD="$(ensure_gradle)"
-
-# version:fabric_api:fabric_loader:forge
-MATRIX=(
-  "1.17.1:0.46.1+1.17:0.14.25:37.1.1"
-  "1.18.2:0.77.0+1.18.2:0.15.11:40.2.21"
-  "1.19.2:0.77.0+1.19.2:0.15.11:43.4.2"
-  "1.20.1:0.92.2+1.20.1:0.16.10:47.3.0"
-  "1.21.1:0.115.1+1.21.1:0.16.10:52.0.30"
+echo "==> Building Fabric $FABRIC_MC (Gradle $FABRIC_GRADLE)"
+FABRIC_GRADLE_CMD="$(ensure_gradle "$FABRIC_GRADLE")"
+(
+  cd "$ROOT_DIR"
+  "$FABRIC_GRADLE_CMD" -p fabric clean build \
+    -Pminecraft_version="$FABRIC_MC" \
+    -Pfabric_loader_version="$FABRIC_LOADER" \
+    -Pfabric_api_version="$FABRIC_API"
 )
+mkdir -p "$DIST_DIR/fabric/$FABRIC_MC"
+cp "$ROOT_DIR/fabric/build/libs"/*.jar "$DIST_DIR/fabric/$FABRIC_MC/"
 
-for row in "${MATRIX[@]}"; do
-  IFS=':' read -r v fabric_api fabric_loader forge_version <<< "$row"
-
-  echo "==> Building Fabric $v"
+FORGE_GRADLE_CMD="$(ensure_gradle "$FORGE_GRADLE")"
+for target in "${FORGE_TARGETS[@]}"; do
+  IFS=':' read -r forge_mc forge_version <<< "$target"
+  echo "==> Building Forge $forge_mc (Gradle $FORGE_GRADLE)"
   (
     cd "$ROOT_DIR"
-    "$GRADLE_CMD" -p fabric clean build \
-      -Pminecraft_version="$v" \
-      -Pyarn_mappings="${v}+build.1" \
-      -Pfabric_loader_version="$fabric_loader" \
-      -Pfabric_api_version="$fabric_api"
-  )
-mkdir -p "$DIST_DIR"
-
-# Minecraft versions requested by user (1.21.11 interpreted as latest Java release line 1.21.1).
-VERSIONS=("1.17.1" "1.18.2" "1.19.2" "1.20.1" "1.21.1")
-
-# Fabric dependency versions aligned to each Minecraft target.
-declare -A FABRIC_API=(
-  ["1.17.1"]="0.46.1+1.17"
-  ["1.18.2"]="0.77.0+1.18.2"
-  ["1.19.2"]="0.77.0+1.19.2"
-  ["1.20.1"]="0.92.2+1.20.1"
-  ["1.21.1"]="0.115.1+1.21.1"
-)
-
-declare -A LOADER=(
-  ["1.17.1"]="0.14.25"
-  ["1.18.2"]="0.15.11"
-  ["1.19.2"]="0.15.11"
-  ["1.20.1"]="0.16.10"
-  ["1.21.1"]="0.16.10"
-)
-
-declare -A FORGE=(
-  ["1.17.1"]="37.1.1"
-  ["1.18.2"]="40.2.21"
-  ["1.19.2"]="43.4.2"
-  ["1.20.1"]="47.3.0"
-  ["1.21.1"]="52.0.30"
-)
-
-for v in "${VERSIONS[@]}"; do
-  echo "==> Building Fabric $v"
-  (cd "$ROOT_DIR" && "$GRADLE_CMD" -p fabric clean build \
-  (cd "$ROOT_DIR" && gradle -p fabric clean build \
-    -Pminecraft_version="$v" \
-    -Pyarn_mappings="${v}+build.1" \
-    -Pfabric_loader_version="${LOADER[$v]}" \
-    -Pfabric_api_version="${FABRIC_API[$v]}")
-
-  mkdir -p "$DIST_DIR/fabric/$v"
-  cp "$ROOT_DIR/fabric/build/libs"/*.jar "$DIST_DIR/fabric/$v/"
-
-  echo "==> Building Forge $v"
-  (
-    cd "$ROOT_DIR"
-    "$GRADLE_CMD" -p forge clean build \
-      -Pminecraft_version="$v" \
+    "$FORGE_GRADLE_CMD" -p forge clean build \
+      -Pminecraft_version="$forge_mc" \
       -Pforge_version="$forge_version"
   )
-  (cd "$ROOT_DIR" && "$GRADLE_CMD" -p forge clean build \
-  (cd "$ROOT_DIR" && gradle -p forge clean build \
-    -Pminecraft_version="$v" \
-    -Pforge_version="${FORGE[$v]}")
-
-  mkdir -p "$DIST_DIR/forge/$v"
-  cp "$ROOT_DIR/forge/build/libs"/*.jar "$DIST_DIR/forge/$v/"
+  mkdir -p "$DIST_DIR/forge/$forge_mc"
+  cp "$ROOT_DIR/forge/build/libs"/*.jar "$DIST_DIR/forge/$forge_mc/"
 done
 
 echo "Built artifacts are in $DIST_DIR"

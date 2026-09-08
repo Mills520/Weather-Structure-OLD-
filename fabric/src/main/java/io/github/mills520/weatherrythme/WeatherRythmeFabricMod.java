@@ -2,6 +2,7 @@ package io.github.mills520.weatherrythme;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -9,15 +10,13 @@ import net.minecraft.world.level.Level;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.nio.charset.StandardCharsets;
-import java.util.UUID;
 
-public class WeatherRythmeFabricMod implements ModInitializer {
+public final class WeatherRythmeFabricMod implements ModInitializer {
     public static final String MOD_ID = "weatherrythme";
     private static final int MIN_INTERVAL_TICKS = 5 * 60 * 20;
     private static final int MAX_INTERVAL_TICKS = 15 * 60 * 20;
 
-    private final Map<UUID, Integer> nextWeatherChangeByLevel = new HashMap<>();
+    private final Map<ResourceKey<Level>, Integer> ticksUntilNextChange = new HashMap<>();
 
     @Override
     public void onInitialize() {
@@ -26,35 +25,39 @@ public class WeatherRythmeFabricMod implements ModInitializer {
 
     private void onServerTick(MinecraftServer server) {
         for (ServerLevel level : server.getAllLevels()) {
-            if (level.dimension() != Level.OVERWORLD) {
+            ResourceKey<Level> key = level.dimension();
+            if (!Level.OVERWORLD.equals(key)) {
                 continue;
             }
 
-            UUID key = UUID.nameUUIDFromBytes(
-                level.dimension().location().toString().getBytes(StandardCharsets.UTF_8)
-            );
-
-            int ticksRemaining = nextWeatherChangeByLevel.getOrDefault(key, 0) - 1;
-            if (ticksRemaining > 0) {
-                nextWeatherChangeByLevel.put(key, ticksRemaining);
+            int remaining = ticksUntilNextChange.getOrDefault(key, 0);
+            if (remaining > 0) {
+                ticksUntilNextChange.put(key, remaining - 1);
                 continue;
             }
 
-            applyRandomWeather(level);
-            nextWeatherChangeByLevel.put(key, nextInterval(level.getRandom()));
+            // The roll decides how long the new weather lasts, and that same span is
+            // when we next roll, so the two can never drift apart.
+            ticksUntilNextChange.put(key, applyRandomWeather(level));
         }
     }
 
-    private void applyRandomWeather(ServerLevel level) {
+    /** Rolls new weather for the level and returns how many ticks it will last. */
+    private int applyRandomWeather(ServerLevel level) {
         RandomSource random = level.getRandom();
+        int duration = nextInterval(random);
         boolean makeRain = random.nextBoolean();
         boolean makeThunder = makeRain && random.nextBoolean();
 
-        int clearDuration = makeRain ? 0 : nextInterval(random);
-        int rainDuration = makeRain ? nextInterval(random) : 0;
-        int thunderDuration = makeThunder ? rainDuration : 0;
-
-        level.setWeatherParameters(clearDuration, rainDuration, makeRain, makeThunder);
+        // Vanilla derives the thunder duration from the rain duration, so passing the
+        // rain span here covers both.
+        level.setWeatherParameters(
+            makeRain ? 0 : duration,
+            makeRain ? duration : 0,
+            makeRain,
+            makeThunder
+        );
+        return duration;
     }
 
     private int nextInterval(RandomSource random) {
